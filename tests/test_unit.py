@@ -1,21 +1,21 @@
-import pytest
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from subslide import (
-    Block,
-    parse_timestamp,
+    build_parser,
     ms_to_timecode,
-    parse_srt_timecode,
     parse_srt,
+    parse_srt_timecode,
+    parse_timestamp,
     serialize_srt,
     shift_blocks,
-    build_parser,
 )
 
-
 # --- parse_timestamp ---
+
 
 def test_parse_timestamp_hh_mm():
     assert parse_timestamp("00:10") == 10 * 60_000
@@ -49,6 +49,7 @@ def test_parse_timestamp_plain_seconds_rejected():
 
 # --- ms_to_timecode ---
 
+
 def test_ms_to_timecode_basic():
     assert ms_to_timecode(3_723_500) == "01:02:03,500"
 
@@ -66,6 +67,7 @@ def test_ms_to_timecode_max_ms():
 
 
 # --- parse_srt_timecode ---
+
 
 def test_parse_srt_timecode():
     start, end = parse_srt_timecode("00:03:43,599 --> 00:03:45,350")
@@ -106,7 +108,7 @@ def test_parse_srt_first_block():
     b = blocks[0]
     assert b.index == 1
     assert b.start_ms == 3 * 60_000 + 43_000 + 599
-    assert b.end_ms   == 3 * 60_000 + 45_000 + 350
+    assert b.end_ms == 3 * 60_000 + 45_000 + 350
     assert b.lines == ["Hola."]
 
 
@@ -127,6 +129,7 @@ def test_parse_srt_invalid_timecode():
 
 
 # --- serialize_srt ---
+
 
 def test_serialize_srt_roundtrip():
     blocks = parse_srt(SRT_SAMPLE)
@@ -162,40 +165,46 @@ def test_serialize_srt_ends_with_newline():
 #   block 1: start=225392, end=226393
 #   block 2: start=314523, end=317317
 
+
 def test_shift_all_delay():
     blocks = parse_srt(SRT_SAMPLE)
     result = shift_blocks(blocks, delta_ms=1_500, from_ms=None, to_ms=None)
     assert result[0].start_ms == 223_599 + 1_500
-    assert result[0].end_ms   == 225_350 + 1_500
+    assert result[0].end_ms == 225_350 + 1_500
     assert result[2].start_ms == 314_523 + 1_500
+
 
 def test_shift_all_advance():
     blocks = parse_srt(SRT_SAMPLE)
     result = shift_blocks(blocks, delta_ms=-500, from_ms=None, to_ms=None)
     assert result[0].start_ms == 223_599 - 500
 
+
 def test_shift_from_filters_earlier_blocks():
     blocks = parse_srt(SRT_SAMPLE)
     # from 5:14 — only block 2 matches
     result = shift_blocks(blocks, delta_ms=1_000, from_ms=314_523, to_ms=None)
-    assert result[0].start_ms == 223_599          # unchanged
-    assert result[1].start_ms == 225_392          # unchanged
+    assert result[0].start_ms == 223_599  # unchanged
+    assert result[1].start_ms == 225_392  # unchanged
     assert result[2].start_ms == 314_523 + 1_000  # shifted
+
 
 def test_shift_to_filters_later_blocks():
     blocks = parse_srt(SRT_SAMPLE)
     # to 3:44 — only block 0 matches
     result = shift_blocks(blocks, delta_ms=1_000, from_ms=None, to_ms=224_000)
     assert result[0].start_ms == 223_599 + 1_000  # shifted
-    assert result[1].start_ms == 225_392           # unchanged
+    assert result[1].start_ms == 225_392  # unchanged
+
 
 def test_shift_range_filters():
     blocks = parse_srt(SRT_SAMPLE)
     # from 3:45 to 3:46 — only block 1 matches
     result = shift_blocks(blocks, delta_ms=2_000, from_ms=225_000, to_ms=226_000)
-    assert result[0].start_ms == 223_599           # unchanged
+    assert result[0].start_ms == 223_599  # unchanged
     assert result[1].start_ms == 225_392 + 2_000  # shifted
-    assert result[2].start_ms == 314_523           # unchanged
+    assert result[2].start_ms == 314_523  # unchanged
+
 
 def test_shift_clamps_to_zero(capsys):
     blocks = parse_srt(SRT_SAMPLE)
@@ -204,6 +213,7 @@ def test_shift_clamps_to_zero(capsys):
     assert result[0].end_ms == 0
     captured = capsys.readouterr()
     assert "clamped" in captured.err
+
 
 def test_shift_clamp_warning_printed_once(capsys):
     blocks = parse_srt(SRT_SAMPLE)
@@ -214,6 +224,7 @@ def test_shift_clamp_warning_printed_once(capsys):
 
 # --- build_parser ---
 
+
 def test_parser_delay():
     p = build_parser()
     args = p.parse_args(["--delay", "1.5", "movie.srt"])
@@ -221,10 +232,12 @@ def test_parser_delay():
     assert args.advance is None
     assert args.file == "movie.srt"
 
+
 def test_parser_advance_short():
     p = build_parser()
     args = p.parse_args(["-a", "0.5", "movie.srt"])
     assert args.advance == 0.5
+
 
 def test_parser_from_to():
     p = build_parser()
@@ -232,10 +245,12 @@ def test_parser_from_to():
     assert args.from_ts == "00:10"
     assert args.to_ts == "00:20"
 
+
 def test_parser_in_place():
     p = build_parser()
     args = p.parse_args(["-d", "1", "-i", "movie.srt"])
     assert args.in_place is True
+
 
 def test_parser_defaults():
     p = build_parser()
@@ -247,8 +262,10 @@ def test_parser_defaults():
 
 # --- main: in-place failure handling ---
 
+
 def test_in_place_failed_backup_copy_keeps_original(tmp_path, monkeypatch):
     import shutil
+
     import subslide
 
     src = tmp_path / "movie.srt"
@@ -277,6 +294,7 @@ def test_in_place_failed_backup_copy_keeps_original(tmp_path, monkeypatch):
 
 # --- parse_srt: block separators ---
 
+
 def test_parse_srt_whitespace_only_separator_splits_blocks():
     text = (
         "1\n00:00:01,000 --> 00:00:02,000\nHi\n"
@@ -291,13 +309,16 @@ def test_parse_srt_whitespace_only_separator_splits_blocks():
 
 # --- timecode variants ---
 
+
 def test_parse_srt_timecode_accepts_dot_separator():
     start, end = parse_srt_timecode("00:00:01.500 --> 00:00:02.250")
     assert (start, end) == (1_500, 2_250)
 
 
 def test_parse_srt_timecode_accepts_trailing_coordinates():
-    start, end = parse_srt_timecode("00:00:01,000 --> 00:00:02,000 X1:10 X2:20 Y1:30 Y2:40")
+    start, end = parse_srt_timecode(
+        "00:00:01,000 --> 00:00:02,000 X1:10 X2:20 Y1:30 Y2:40"
+    )
     assert (start, end) == (1_000, 2_000)
 
 

@@ -66,6 +66,17 @@ Output written to **stdout** is always UTF-8, even when the input was latin-1.
 
 Python 3.10+, no external dependencies.
 
+## Development
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+
+.venv/bin/pytest
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
 ## License
 
 [MIT](LICENSE)

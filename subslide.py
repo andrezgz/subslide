@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 import argparse
 import math
 import re
@@ -19,7 +20,7 @@ class Block:
 
 
 _TIMECODE_RE = re.compile(
-    r'(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+(\S.*))?'
+    r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+(\S.*))?"
 )
 
 
@@ -29,7 +30,7 @@ def _parse_timecode_line(s: str) -> tuple[int, int, str]:
         raise ValueError(f"Invalid timecode: {s!r}")
     h1, m1, s1, ms1, h2, m2, s2, ms2 = (int(x) for x in m.groups()[:8])
     start = h1 * 3_600_000 + m1 * 60_000 + s1 * 1_000 + ms1
-    end   = h2 * 3_600_000 + m2 * 60_000 + s2 * 1_000 + ms2
+    end = h2 * 3_600_000 + m2 * 60_000 + s2 * 1_000 + ms2
     return start, end, m.group(9) or ""
 
 
@@ -40,15 +41,15 @@ def parse_srt_timecode(s: str) -> tuple[int, int]:
 
 def parse_timestamp(s: str) -> int:
     """Parse user-supplied --from/--to timestamp to milliseconds."""
-    m = re.fullmatch(r'(\d+):(\d{2}):(\d{2})[,.](\d{3})', s)
+    m = re.fullmatch(r"(\d+):(\d{2}):(\d{2})[,.](\d{3})", s)
     if m:
         h, mn, sc, ms = int(m[1]), int(m[2]), int(m[3]), int(m[4])
         return h * 3_600_000 + mn * 60_000 + sc * 1_000 + ms
-    m = re.fullmatch(r'(\d+):(\d{2}):(\d{2})', s)
+    m = re.fullmatch(r"(\d+):(\d{2}):(\d{2})", s)
     if m:
         h, mn, sc = int(m[1]), int(m[2]), int(m[3])
         return h * 3_600_000 + mn * 60_000 + sc * 1_000
-    m = re.fullmatch(r'(\d+):(\d{2})', s)
+    m = re.fullmatch(r"(\d+):(\d{2})", s)
     if m:
         h, mn = int(m[1]), int(m[2])
         return h * 3_600_000 + mn * 60_000
@@ -69,16 +70,16 @@ def ms_to_timecode(ms: int) -> str:
 def parse_srt(text: str) -> list[Block]:
     """Parse SRT format text."""
     blocks: list[Block] = []
-    chunks = re.split(r'\n[ \t]*\n\s*', text.strip())
-    for chunk in chunks:
-        chunk = chunk.strip()
+    chunks = re.split(r"\n[ \t]*\n\s*", text.strip())
+    for raw_chunk in chunks:
+        chunk = raw_chunk.strip()
         if not chunk:
             continue
         lines = chunk.splitlines()
         try:
             index = int(lines[0].strip())
         except (ValueError, IndexError):
-            raise ValueError(f"Malformed block index near: {lines[0]!r}")
+            raise ValueError(f"Malformed block index near: {lines[0]!r}") from None
         if len(lines) < 2:
             raise ValueError(f"block {index}: missing timecode line")
         try:
@@ -86,7 +87,15 @@ def parse_srt(text: str) -> list[Block]:
         except ValueError as exc:
             raise ValueError(f"block {index}: {exc}") from exc
         text_lines = lines[2:]
-        blocks.append(Block(index=index, start_ms=start_ms, end_ms=end_ms, lines=text_lines, extra=extra))
+        blocks.append(
+            Block(
+                index=index,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                lines=text_lines,
+                extra=extra,
+            )
+        )
     return blocks
 
 
@@ -115,23 +124,26 @@ def shift_blocks(
     result: list[Block] = []
     warned = False
     for b in blocks:
-        in_range = (
-            (from_ms is None or b.start_ms >= from_ms) and
-            (to_ms is None or b.start_ms <= to_ms)
+        in_range = (from_ms is None or b.start_ms >= from_ms) and (
+            to_ms is None or b.start_ms <= to_ms
         )
         if in_range:
             new_start = b.start_ms + delta_ms
             new_end = b.end_ms + delta_ms
             if (new_start < 0 or new_end < 0) and not warned:
-                print("Warning: some timestamps clamped to 00:00:00,000", file=sys.stderr)
+                print(
+                    "Warning: some timestamps clamped to 00:00:00,000", file=sys.stderr
+                )
                 warned = True
-            result.append(Block(
-                index=b.index,
-                start_ms=max(0, new_start),
-                end_ms=max(0, new_end),
-                lines=b.lines,
-                extra=b.extra,
-            ))
+            result.append(
+                Block(
+                    index=b.index,
+                    start_ms=max(0, new_start),
+                    end_ms=max(0, new_end),
+                    lines=b.lines,
+                    extra=b.extra,
+                )
+            )
         else:
             result.append(b)
     return result
@@ -194,7 +206,7 @@ def main() -> None:
         print(f"Error parsing {args.file}: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    delta_ms = int(round(amount * 1_000))
+    delta_ms = round(amount * 1_000)
     if args.advance is not None:
         delta_ms = -delta_ms
 
@@ -204,7 +216,12 @@ def main() -> None:
     if args.in_place:
         bkp = path.with_suffix(path.suffix + ".bkp")
         if bkp.exists():
-            print(f"{bkp} already exists. Overwrite? [y/N] ", end="", file=sys.stderr, flush=True)
+            print(
+                f"{bkp} already exists. Overwrite? [y/N] ",
+                end="",
+                file=sys.stderr,
+                flush=True,
+            )
             try:
                 answer = input().strip().lower()
             except EOFError:
@@ -237,24 +254,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     group = p.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "-d", "--delay", type=float, metavar="SECONDS",
+        "-d",
+        "--delay",
+        type=float,
+        metavar="SECONDS",
         help="Shift subtitles later by SECONDS",
     )
     group.add_argument(
-        "-a", "--advance", type=float, metavar="SECONDS",
+        "-a",
+        "--advance",
+        type=float,
+        metavar="SECONDS",
         help="Shift subtitles earlier by SECONDS",
     )
 
     p.add_argument(
-        "-f", "--from", dest="from_ts", metavar="TIMESTAMP",
+        "-f",
+        "--from",
+        dest="from_ts",
+        metavar="TIMESTAMP",
         help="Only shift subtitles at or after this time",
     )
     p.add_argument(
-        "-t", "--to", dest="to_ts", metavar="TIMESTAMP",
+        "-t",
+        "--to",
+        dest="to_ts",
+        metavar="TIMESTAMP",
         help="Only shift subtitles at or before this time",
     )
     p.add_argument(
-        "-i", "--in-place", action="store_true",
+        "-i",
+        "--in-place",
+        action="store_true",
         help="Modify the file; creates FILE.bkp before changing",
     )
     return p

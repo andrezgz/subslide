@@ -7,18 +7,22 @@ import pytest
 
 SCRIPT = Path(__file__).parent.parent / "subslide.py"
 FIXTURES = Path(__file__).parent / "fixtures"
-SAMPLE = FIXTURES / "sample.srt"           # first sub at 00:03:43,599
+SAMPLE = FIXTURES / "sample.srt"  # first sub at 00:03:43,599
 SAMPLE_FILES = sorted(FIXTURES.glob("*.srt"))
 
 
 def run(*args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(SCRIPT)] + list(args),
-        capture_output=True, text=True, input=stdin,
+        [sys.executable, str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        input=stdin,
+        check=False,
     )
 
 
 # ── stdout output ─────────────────────────────────────────────────────────────
+
 
 def test_stdout_output():
     r = run("--delay", "1.5", str(SAMPLE))
@@ -52,6 +56,7 @@ def test_hh_mm_timestamp_format():
 
 # ── all fixture files parse without error ─────────────────────────────────────
 
+
 @pytest.mark.parametrize("srt", SAMPLE_FILES, ids=lambda p: p.name)
 def test_all_fixture_files(srt: Path):
     r = run("--delay", "1.5", str(srt))
@@ -60,6 +65,7 @@ def test_all_fixture_files(srt: Path):
 
 
 # ── latin-1 encoding fallback ─────────────────────────────────────────────────
+
 
 def test_latin1_encoding_fallback(tmp_path):
     srt = tmp_path / "latin1.srt"
@@ -71,6 +77,7 @@ def test_latin1_encoding_fallback(tmp_path):
 
 
 # ── --in-place ────────────────────────────────────────────────────────────────
+
 
 def test_in_place_creates_backup(tmp_path):
     src = tmp_path / "test.srt"
@@ -117,6 +124,7 @@ def test_bkp_exists_confirm_no(tmp_path):
 
 # ── error handling ────────────────────────────────────────────────────────────
 
+
 def test_file_not_found():
     r = run("--delay", "1", "nonexistent.srt")
     assert r.returncode == 1
@@ -153,6 +161,7 @@ def test_utf8_bom_preserved_in_place(tmp_path):
 
 # ── line endings ──────────────────────────────────────────────────────────────
 
+
 def test_crlf_preserved_in_place(tmp_path):
     src = tmp_path / "crlf.srt"
     src.write_bytes(
@@ -177,6 +186,7 @@ def test_lf_stays_lf_in_place(tmp_path):
 
 # ── non-finite SECONDS ────────────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
 def test_non_finite_seconds_rejected(value):
     r = run("--delay", value, str(SAMPLE))
@@ -186,6 +196,7 @@ def test_non_finite_seconds_rejected(value):
 
 
 # ── non-interactive overwrite prompt ──────────────────────────────────────────
+
 
 def test_bkp_exists_closed_stdin_aborts_cleanly(tmp_path):
     src = tmp_path / "test.srt"
@@ -209,6 +220,7 @@ def test_bkp_prompt_goes_to_stderr(tmp_path):
 
 
 # ── unsupported encodings ─────────────────────────────────────────────────────
+
 
 @pytest.mark.parametrize("encoding", ["utf-16", "utf-16-be"])
 def test_utf16_file_reports_unsupported_encoding(tmp_path, encoding):
