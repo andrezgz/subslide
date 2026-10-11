@@ -65,3 +65,7 @@ Output written to **stdout** is always UTF-8, even when the input was latin-1.
 ## Requirements
 
 Python 3.10+, no external dependencies.
+
+## License
+
+[MIT](LICENSE)
